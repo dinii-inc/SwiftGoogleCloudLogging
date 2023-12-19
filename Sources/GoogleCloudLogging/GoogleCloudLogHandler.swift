@@ -260,7 +260,7 @@ public struct GoogleCloudLogHandler: LogHandler {
             return
         }
 
-        if level.index() < threshold.index() {
+        if level.index < threshold.index {
             return
         }
 
