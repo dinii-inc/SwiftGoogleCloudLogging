@@ -21,6 +21,7 @@ let package = Package(
             name: "GoogleCloudLogging",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
+                .product(name: "SwiftyJSON", package: "SwiftyJSON"),
             ]),
         .testTarget(
             name: "GoogleCloudLoggingTests",
