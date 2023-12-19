@@ -1,6 +1,7 @@
 import XCTest
 @testable import GoogleCloudLogging
 import Logging
+import SwiftyJSON
 
 
 final class GoogleCloudLoggingTests: XCTestCase {
@@ -34,9 +35,9 @@ final class GoogleCloudLoggingTests: XCTestCase {
         let gcl = try! GoogleCloudLogging(serviceAccountCredentials: Self.url)
         let dg = DispatchGroup()
         dg.enter()
-        let e1 = GoogleCloudLogging.Log.Entry(logName: "", timestamp: nil, severity: nil, insertId: nil, labels: nil, sourceLocation: nil, textPayload: "Message 1")
-        let e2 = GoogleCloudLogging.Log.Entry(logName: " Test-2\n.", timestamp: Date(), severity: .default, insertId: nil, labels: [:], sourceLocation: nil, textPayload: " Message\n2 👌")
-        let e3 = GoogleCloudLogging.Log.Entry(logName: "/Test_3", timestamp: Date() - 10, severity: .emergency, insertId: "ttt", labels: ["a": "A", "b": "B"], sourceLocation: .init(file: #file, line: String(#line), function: #function), textPayload: "Message 3")
+        let e1 = GoogleCloudLogging.Log.Entry(logName: "", timestamp: nil, severity: nil, insertId: nil, labels: nil, sourceLocation: nil, jsonPayload: JSON(dictionaryLiteral: ("message", "Message 1")))
+        let e2 = GoogleCloudLogging.Log.Entry(logName: " Test-2\n.", timestamp: Date(), severity: .default, insertId: nil, labels: [:], sourceLocation: nil, jsonPayload: JSON(dictionaryLiteral: ("message", " Message\n2 👌")))
+        let e3 = GoogleCloudLogging.Log.Entry(logName: "/Test_3", timestamp: Date() - 10, severity: .emergency, insertId: "ttt", labels: ["a": "A", "b": "B"], sourceLocation: .init(file: #file, line: String(#line), function: #function), jsonPayload: JSON(dictionaryLiteral: ("message", "Message 3")))
         gcl.write(entries: [e1, e2, e3]) { result in
             if case .failure = result { XCTFail() }
             print(result)

@@ -19,7 +19,7 @@
 //
 
 import Foundation
-
+import SwiftyJSON
 
 class GoogleCloudLogging {
     
@@ -197,7 +197,7 @@ class GoogleCloudLogging {
             let insertId: String?
             let labels: [String: String]?
             let sourceLocation: SourceLocation?
-            let textPayload: String
+            let jsonPayload: JSON
         }
         let resource: MonitoredResource
         let entries: [Entry]
