@@ -22,17 +22,6 @@ import Foundation
 import Logging
 import SwiftyJSON
 
-extension Logger.Message {
-    func json() -> JSON {
-        let message = "\(self)"
-        do {
-            return try JSON(data: message.data(using: .utf8)!)
-        } catch {
-            return JSON(dictionaryLiteral: ("message", message))
-        }
-    }
-}
-
 /// Customizable SwiftLog logging backend for Google Cloud Logging via REST API v2 with offline functionality.
 public struct GoogleCloudLogHandler: LogHandler {
     
