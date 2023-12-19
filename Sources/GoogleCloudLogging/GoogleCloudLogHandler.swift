@@ -22,17 +22,6 @@ import Foundation
 import Logging
 import SwiftyJSON
 
-extension Logger.Message {
-    func json() -> JSON {
-        let message = "\(self)"
-        do {
-            return try JSON(data: message.data(using: .utf8)!)
-        } catch {
-            return JSON(dictionaryLiteral: ("message", message))
-        }
-    }
-}
-
 /// Customizable SwiftLog logging backend for Google Cloud Logging via REST API v2 with offline functionality.
 public struct GoogleCloudLogHandler: LogHandler {
     
@@ -264,14 +253,8 @@ public struct GoogleCloudLogHandler: LogHandler {
                 return hasher.finalize()
             }
             var metadata = metadata ?? [:]
-            var replacedMetadata = metadata.update(with: self.metadata)
-            if !replacedMetadata.isEmpty, file != #file || function != #function {
-                Self.logger.warning("Log metadata is replaced by logger metadata", metadata: [MetadataKey.replacedMetadata: .dictionary(replacedMetadata)])
-            }
-            replacedMetadata = metadata.update(with: Self.globalMetadata)
-            if !replacedMetadata.isEmpty, file != #file || function != #function {
-                Self.logger.warning("Log metadata is replaced by global metadata", metadata: [MetadataKey.replacedMetadata: .dictionary(replacedMetadata)])
-            }
+            metadata += self.metadata
+            metadata += Self.globalMetadata
             let labels = metadata.mapValues { "\($0)" }
             let logEntry = GoogleCloudLogging.Log.Entry(logName: self.label,
                                                         timestamp: date,
@@ -283,9 +266,9 @@ public struct GoogleCloudLogHandler: LogHandler {
             do {
                 try Self.prepareLogFile()
                 let fileHandle = try FileHandle(forWritingTo: Self.logFile)
-                try fileHandle.legacySeekToEnd()
-                try fileHandle.legacyWrite(contentsOf: JSONEncoder().encode(logEntry))
-                try fileHandle.legacyWrite(contentsOf: [.newline])
+                try fileHandle.seekToEnd()
+                try fileHandle.write(contentsOf: JSONEncoder().encode(logEntry))
+                try fileHandle.write(contentsOf: [.newline])
             } catch {
                 if file != #file || function != #function {
                     Self.logger.error("Unable to save log entry", metadata: [MetadataKey.logEntry: "\(logEntry)", MetadataKey.error: "\(error)"])
@@ -320,7 +303,7 @@ public struct GoogleCloudLogHandler: LogHandler {
         fileHandleQueue.async {
             do {
                 let fileHandle = try FileHandle(forReadingFrom: logFile)
-                guard let data = try fileHandle.legacyReadToEnd(), !data.isEmpty else {
+                guard let data = try fileHandle.readToEnd(), !data.isEmpty else {
                     logger.debug("No logs to upload")
                     return
                 }
@@ -366,7 +349,7 @@ public struct GoogleCloudLogHandler: LogHandler {
                 
                 func deleteOldEntries() {
                     do {
-                        try (fileHandle.legacyReadToEnd() ?? Data()).write(to: logFile, options: .atomic)
+                        try (fileHandle.readToEnd() ?? Data()).write(to: logFile, options: .atomic)
                         logger.debug("Uploaded logs have been deleted")
                     } catch {
                         logger.error("Unable to delete uploaded logs", metadata: [MetadataKey.error: "\(error)"])
@@ -378,7 +361,7 @@ public struct GoogleCloudLogHandler: LogHandler {
                         if lineCount != logEntries.count {
                             let encoder = JSONEncoder()
                             var lines = logEntries.compactMap { try? encoder.encode($0) }
-                            if let data = try fileHandle.legacyReadToEnd(), !data.isEmpty {
+                            if let data = try fileHandle.readToEnd(), !data.isEmpty {
                                 lines.append(data)
                             }
                             try Data(lines.joined(separator: [.newline])).write(to: logFile, options: .atomic)
@@ -467,36 +450,6 @@ extension Data.Element {
 
 
 
-extension FileHandle {
-    
-    @discardableResult
-    func legacySeekToEnd() throws -> UInt64 {
-        if #available(OSX 10.15, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
-            return try seekToEnd()
-        } else {
-            return seekToEndOfFile()
-        }
-    }
-    
-    func legacyWrite<T>(contentsOf data: T) throws where T : DataProtocol {
-        if #available(OSX 10.15, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
-            try write(contentsOf: data)
-        } else {
-            write(Data(data))
-        }
-    }
-    
-    func legacyReadToEnd() throws -> Data? {
-        if #available(OSX 10.15, iOS 13.4, watchOS 6.2, tvOS 13.4, *) {
-            return try readToEnd()
-        } else {
-            return readDataToEndOfFile()
-        }
-    }
-}
-
-
-
 extension DispatchSourceTimer {
     
     func schedule(delay: TimeInterval?, repeating: TimeInterval?) {
@@ -508,10 +461,8 @@ extension DispatchSourceTimer {
 
 extension Dictionary {
     
-    mutating func update(with other: [Key : Value]) -> [Key : Value] {
-        var replaced = [Key : Value]()
-        self = other.reduce(into: self) { replaced[$1.key] = $0.updateValue($1.value, forKey: $1.key) }
-        return replaced
+    static func +=(lhs: inout Self, rhs: Self) {
+        lhs.merge(rhs) { _ , new in new }
     }
 }
 
@@ -529,4 +480,17 @@ extension GoogleCloudLogHandler.MetadataKey {
     static let maxLogSize = "maxLogSize"
     static let retentionPeriod = "retentionPeriod"
     static let uploadInterval = "uploadInterval"
+}
+
+
+
+extension Logger.Message {
+    func json() -> JSON {
+        let message = "\(self)"
+        do {
+            return try JSON(data: message.data(using: .utf8)!)
+        } catch {
+            return JSON(dictionaryLiteral: ("message", message))
+        }
+    }
 }
