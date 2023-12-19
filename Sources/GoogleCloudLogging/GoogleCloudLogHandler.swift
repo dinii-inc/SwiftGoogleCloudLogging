@@ -78,6 +78,18 @@ public struct GoogleCloudLogHandler: LogHandler {
     /// **Default** is `.critical`.
     ///
     @Atomic public static var signalingLogLevel: Logger.Level? = .critical
+
+    /// The log level threshold to judge whether to send logs to Cloud Logging  *Atomic*.
+    ///
+    /// **Default** is `.critical`.
+    ///
+    @Atomic public static var logLevelThresholdToSendCloudLogging: Logger.Level? = .info
+
+    /// The threshold log level to judge whether to send internal logger logs to Cloud Logging  *Atomic*.
+    ///
+    /// **Default** is `.critical`.
+    ///
+    @Atomic public static var internalLogLevelThresholdToSendCloudLogging: Logger.Level? = .critical
     
     /// Log entry upload size limit in bytes. *Atomic*.
     ///
@@ -214,9 +226,9 @@ public struct GoogleCloudLogHandler: LogHandler {
         
         DispatchQueue.main.async { // Async in case setup before LoggingSystem bootstrap.
             if isFirstSetup {
-                logger.info("GoogleCloudLogHandler has been setup", metadata: [MetadataKey.serviceAccountCredentials: "\(url)", MetadataKey.logFile: "\(logFile)"])
+                logger.info("GoogleCloudLogHandler has been setup")
             } else {
-                logger.warning("Repeated setup of GoogleCloudLogHandler", metadata: [MetadataKey.serviceAccountCredentials: "\(url)", MetadataKey.logFile: "\(logFile)"])
+                logger.warning("Repeated setup of GoogleCloudLogHandler")
                 fileHandleQueue.async { // Assert in fileHandleQueue so warning is saved.
                     assertionFailure("App should only setup GoogleCloudLogHandler once")
                 }
@@ -241,6 +253,17 @@ public struct GoogleCloudLogHandler: LogHandler {
     
     
     public func log(level: Logger.Level, message: Logger.Message, metadata: Logger.Metadata?, file: String, function: String, line: UInt) {
+
+        let threshold = self.label == Self.logger.label ? Self.internalLogLevelThresholdToSendCloudLogging : Self.logLevelThresholdToSendCloudLogging
+
+        guard let threshold = threshold else {
+            return
+        }
+
+        if level.index() < threshold.index() {
+            return
+        }
+
         
         let date = Date()
         
@@ -470,8 +493,6 @@ extension Dictionary {
 
 extension GoogleCloudLogHandler.MetadataKey {
     
-    static let serviceAccountCredentials = "serviceAccountCredentials"
-    static let logFile = "logFile"
     static let label = "label"
     static let replacedMetadata = "replacedMetadata"
     static let logEntry = "logEntry"
@@ -492,5 +513,13 @@ extension Logger.Message {
         } catch {
             return JSON(dictionaryLiteral: ("message", message))
         }
+    }
+}
+
+
+
+extension Hashable where Self : CaseIterable {
+    var index: Self.AllCases.Index {
+        return type(of: self).allCases.firstIndex(of: self)!
     }
 }
